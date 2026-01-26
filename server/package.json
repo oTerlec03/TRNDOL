@@ -1,0 +1,14 @@
+{
+  "name": "tomax-trendyol-panel-server",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1"
+  }
+}

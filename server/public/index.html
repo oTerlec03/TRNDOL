@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>TOMAX Pazaryeri Paneli</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#0f1730; --card:#121c3a; --card2:#0e162e;
+      --line:#23335a; --text:#e8eeff; --muted:#90a2c8;
+      --blue:#2c74ff; --blue2:#1a57d6;
+      --green:#27d17f; --red:#ff4d4d; --amber:#ffb020;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --r: 16px;
+      --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      --sans: Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--sans); color:var(--text); background:
+        radial-gradient(1100px 700px at 15% -10%, rgba(44,116,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 90% 0%, rgba(39,209,127,.12), transparent 55%),
+        radial-gradient(900px 700px at 55% 110%, rgba(255,176,32,.10), transparent 55%),
+        var(--bg);
+      min-height:100vh;
+    }
+    a{color:inherit}
+    .wrap{max-width:1400px; margin:0 auto; padding:18px}
+    header{
+      position:sticky; top:0; z-index:50;
+      background:rgba(11,16,32,.78);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid rgba(35,51,90,.65);
+    }
+    .topbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+    .brand{display:flex; flex-direction:column; gap:2px}
+    .brand h1{margin:0; font-size:16px; letter-spacing:.2px}
+    .brand .sub{font-size:12px; color:var(--muted)}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px; border:1px solid rgba(35,51,90,.8);
+      border-radius:999px; background:rgba(15,23,48,.55);
+      color:var(--muted); font-size:12px
+    }
+    .dot{width:8px; height:8px; border-radius:99px; background:#63739a}
+    .dot.ok{background:var(--green)}
+    .dot.bad{background:var(--red)}
+    .dot.warn{background:var(--amber)}
+    .chip b{color:var(--text)}
+    .right{margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .linkbar{display:flex; gap:10px; font-size:12px; color:var(--muted)}
+    .linkbar a{opacity:.9}
+    .tabs{
+      margin-top:12px;
+      display:flex; gap:8px; flex-wrap:wrap;
+    }
+    .tab{
+      cursor:pointer;
+      padding:10px 12px; border-radius:12px;
+      border:1px solid rgba(35,51,90,.9);
+      background:rgba(15,23,48,.45);
+      color:var(--muted); font-size:13px;
+      user-select:none;
+    }
+    .tab.active{
+      background:rgba(44,116,255,.14);
+      border-color:rgba(44,116,255,.55);
+      color:var(--text);
+    }
+    .grid{display:grid; grid-template-columns: 1.25fr .75fr; gap:14px}
+    @media (max-width:1100px){ .grid{grid-template-columns:1fr} }
+    .card{
+      background:linear-gradient(180deg, rgba(18,28,58,.88), rgba(14,22,46,.88));
+      border:1px solid rgba(35,51,90,.75);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding:14px;
+    }
+    .card h2{margin:0 0 10px 0; font-size:14px}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:end}
+    label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px 2px}
+    input,select,textarea{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(35,51,90,.9);
+      background:rgba(14,22,46,.85);
+      color:var(--text);
+      outline:none;
+    }
+    textarea{min-height:110px; resize:vertical; font-family:var(--mono); font-size:12px}
+    .mono{font-family:var(--mono)}
+    .btn{
+      cursor:pointer;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(35,51,90,.9);
+      background:rgba(14,22,46,.85);
+      color:var(--text);
+      font-weight:600;
+    }
+    .btn.primary{background:linear-gradient(180deg, var(--blue), var(--blue2)); border-color:rgba(44,116,255,.75)}
+    .btn.green{background:rgba(39,209,127,.14); border-color:rgba(39,209,127,.45)}
+    .btn.red{background:rgba(255,77,77,.14); border-color:rgba(255,77,77,.45)}
+    .btn.amber{background:rgba(255,176,32,.14); border-color:rgba(255,176,32,.45)}
+    .btn:disabled{opacity:.45; cursor:not-allowed}
+    .hint{font-size:12px; color:var(--muted); margin-top:8px; line-height:1.35}
+    .warn{color:#ff9a9a}
+
+    table{width:100%; border-collapse:separate; border-spacing:0 8px}
+    th{
+      text-align:left; font-size:12px; color:var(--muted); font-weight:700;
+      padding:0 10px;
+    }
+    td{
+      background:rgba(14,22,46,.9);
+      border-top:1px solid rgba(35,51,90,.85);
+      border-bottom:1px solid rgba(35,51,90,.85);
+      padding:10px;
+      vertical-align:top;
+    }
+    tr td:first-child{
+      border-left:1px solid rgba(35,51,90,.85);
+      border-top-left-radius:12px; border-bottom-left-radius:12px;
+    }
+    tr td:last-child{
+      border-right:1px solid rgba(35,51,90,.85);
+      border-top-right-radius:12px; border-bottom-right-radius:12px;
+    }
+    .title{font-weight:800; margin-bottom:4px}
+    .subline{font-size:12px; color:var(--muted)}
+    .badge{
+      display:inline-flex; gap:6px; align-items:center;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(35,51,90,.9);
+      background:rgba(15,23,48,.55);
+      font-size:12px; color:var(--muted);
+      user-select:none;
+    }
+    .toolbar{
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      padding:10px; border-radius:14px;
+      background:rgba(15,23,48,.35);
+      border:1px solid rgba(35,51,90,.7);
+    }
+    .stickyActions{
+      position:sticky; bottom:12px;
+      margin-top:12px;
+      background:rgba(15,23,48,.55);
+      backdrop-filter: blur(10px);
+    }
+    .log{
+      background:rgba(10,16,30,.92);
+      border:1px solid rgba(35,51,90,.85);
+      border-radius:14px;
+      padding:12px;
+      max-height:340px;
+      overflow:auto;
+      white-space:pre-wrap;
+      font-family:var(--mono);
+      font-size:12px;
+      color:#cfe0ff;
+    }
+    .split2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    @media (max-width:900px){ .split2{grid-template-columns:1fr} }
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <h1>TOMAX Pazaryeri Paneli</h1>
+        <div class="sub">Trendyol API – hızlı yönetim arayüzü (backend’e dokunmadan UI giydirme)</div>
+      </div>
+
+      <div class="chips">
+        <span class="chip"><span id="healthDot" class="dot"></span> API: <b id="healthText">kontrol</b></span>
+        <span class="chip">Seçili: <b id="selCount">0</b></span>
+        <span class="chip">Sayfa: <b id="pageInfo">-</b></span>
+      </div>
+
+      <div class="right">
+        <div class="linkbar">
+          <a href="/health" target="_blank">/health</a>
+          <a href="/debug/config" target="_blank">/debug/config</a>
+          <a href="/api/backup" target="_blank">/api/backup</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="products">Ürünler</div>
+      <div class="tab" data-tab="orders">Siparişler</div>
+      <div class="tab" data-tab="tools">Araçlar</div>
+      <div class="tab" data-tab="debug">Çıktı / Log</div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="tab-products">
+    <div class="grid">
+      <div class="card">
+        <h2>Ürün Listeleme</h2>
+
+        <div class="row">
+          <div style="width:120px">
+            <label>Page</label>
+            <input id="page" type="number" value="0" min="0"/>
+          </div>
+          <div style="width:120px">
+            <label>Size</label>
+            <input id="size" type="number" value="50" min="1"/>
+          </div>
+          <div style="width:180px">
+            <label>Arşiv Filtresi</label>
+            <select id="archived">
+              <option value="">(Filtre yok)</option>
+              <option value="false">Arşivsiz</option>
+              <option value="true">Arşivli</option>
+            </select>
+          </div>
+          <div style="flex:1; min-width:260px">
+            <label>Arama (title / barcode / stockCode)</label>
+            <input id="q" placeholder="örn: CLH..., 869..., mandren, matkap ucu..."/>
+          </div>
+
+          <button class="btn primary" id="btnLoadProducts">Ürünleri Getir</button>
+          <button class="btn" id="btnClearSel">Seçimi Temizle</button>
+        </div>
+
+        <div class="toolbar stickyActions">
+          <span class="badge">Seçili barkodlarla hızlı işlem</span>
+          <button class="btn red" id="btnDisable">Pasif Et (qty=0)</button>
+          <button class="btn green" id="btnEnable">Aktif Et</button>
+          <button class="btn amber" id="btnArchive">Arşivle</button>
+          <button class="btn" id="btnUnarchive">Arşivden Çıkar</button>
+
+          <div style="display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap">
+            <label style="margin:0; color:var(--muted); font-size:12px">Aktif ederken default qty (ops.)</label>
+            <input id="defaultQty" type="number" placeholder="örn: 10" style="width:120px"/>
+          </div>
+        </div>
+
+        <div class="hint">
+          Not: Pasif/Aktif işlemleri stok üzerinden çalışır (quantity). Arşiv farklıdır.
+        </div>
+
+        <div style="margin-top:12px; overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:44px"></th>
+                <th>Ürün</th>
+                <th style="width:240px">Barcode</th>
+                <th style="width:120px">Qty</th>
+                <th style="width:120px">Sale</th>
+                <th style="width:120px">List</th>
+              </tr>
+            </thead>
+            <tbody id="productsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Seçili Barkodlar</h2>
+
+        <div class="row">
+          <div style="flex:1">
+            <label>Seçili liste</label>
+            <textarea id="selectedBarcodes" readonly placeholder="Tablodan seçtikçe burada birikir"></textarea>
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1; min-width:260px">
+            <label>Hızlı barkod ekle</label>
+            <input id="addBarcode" class="mono" placeholder="tek barkod yazıp Enter"/>
+          </div>
+          <button class="btn" id="btnAddBarcode">Ekle</button>
+        </div>
+
+        <div class="hint">
+          Tabloda görünmese bile buraya eklediğin barkodlarla işlem yapılabilir (endpoint’ler barkod listesi alıyor).
+        </div>
+
+        <h2 style="margin-top:14px">Hızlı Title Update</h2>
+        <div class="row">
+          <div style="width:220px">
+            <label>Barcode</label>
+            <input id="up_barcode" class="mono" placeholder="CLH..."/>
+          </div>
+          <div style="flex:1; min-width:260px">
+            <label>Yeni Title</label>
+            <input id="up_title" placeholder="Yeni ürün adı"/>
+          </div>
+          <button class="btn amber" id="btnUpdateTitle">Güncelle</button>
+        </div>
+        <div class="hint warn">
+          Not: Trendyol bazı hesaplarda title update için ek alanlar isteyebilir. Hata mesajı log’da görünecek.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-orders" style="display:none">
+    <div class="card">
+      <h2>Siparişler (Shipment Packages)</h2>
+      <div class="row">
+        <div style="width:220px">
+          <label>startDate (YYYY-MM-DD)</label>
+          <input id="startDate" placeholder="2026-01-01"/>
+        </div>
+        <div style="width:220px">
+          <label>endDate (YYYY-MM-DD)</label>
+          <input id="endDate" placeholder="2026-01-26"/>
+        </div>
+        <div style="width:220px">
+          <label>status (opsiyonel)</label>
+          <input id="status" placeholder="Created / Shipped ..."/>
+        </div>
+        <button class="btn primary" id="btnLoadOrders">Siparişleri Getir</button>
+      </div>
+
+      <div class="hint">
+        Not: Orders endpoint bazı hesaplarda 401 dönebilir (Trendyol yetki/izin). Hata detayını log’dan okuyacağız.
+      </div>
+
+      <div style="margin-top:12px; overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>Özet</th>
+              <th style="width:200px">Id / No</th>
+              <th style="width:160px">Status</th>
+              <th style="width:220px">Date</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-tools" style="display:none">
+    <div class="grid">
+      <div class="card">
+        <h2>Backup’a Manuel Quantity Kaydet</h2>
+        <div class="row">
+          <div style="width:240px">
+            <label>barcode</label>
+            <input id="bk_barcode" class="mono" placeholder="CLH..."/>
+          </div>
+          <div style="width:180px">
+            <label>quantity</label>
+            <input id="bk_qty" type="number" placeholder="10"/>
+          </div>
+          <button class="btn primary" id="btnBackupSet">Kaydet</button>
+        </div>
+        <div class="hint">Aktif Et sırasında doğru stoğa dönmek için.</div>
+      </div>
+
+      <div class="card">
+        <h2>Stok & Fiyat Güncelle (Tek ürün)</h2>
+        <div class="row">
+          <div style="width:240px">
+            <label>barcode</label>
+            <input id="inv_barcode" class="mono" placeholder="CLH..."/>
+          </div>
+          <div style="width:160px">
+            <label>quantity</label>
+            <input id="inv_qty" type="number" placeholder="10"/>
+          </div>
+          <div style="width:160px">
+            <label>salePrice</label>
+            <input id="inv_sale" type="number" step="0.01" placeholder="199.90"/>
+          </div>
+          <div style="width:160px">
+            <label>listPrice</label>
+            <input id="inv_list" type="number" step="0.01" placeholder="249.90"/>
+          </div>
+          <button class="btn primary" id="btnInventoryOne">Gönder</button>
+        </div>
+
+        <h2 style="margin-top:14px">Toplu Stok & Fiyat (çoklu)</h2>
+        <div class="hint">Format: her satır <span class="mono">barcode;quantity;salePrice;listPrice</span></div>
+        <textarea id="bulkLines" placeholder="CLH...;10;199.90;249.90&#10;CLH...;0;149.90;199.90"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnInventoryBulk">Toplu Gönder</button>
+          <button class="btn" id="btnBulkFromSelected">Seçililerden Şablon</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-debug" style="display:none">
+    <div class="split2">
+      <div class="card">
+        <h2>Çıktı</h2>
+        <div id="out" class="log">Hazır.</div>
+      </div>
+      <div class="card">
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    products: [],
+    selected: new Set(),
+    lastProductsResponse: null,
+    lastOrdersResponse: null
+  };
+
+  function setOut(obj){
+    const el = $("out");
+    if (typeof obj === "string") el.textContent = obj;
+    else el.textContent = JSON.stringify(obj, null, 2);
+  }
+
+  function addLog(msg){
+    const ts = new Date().toLocaleString("tr-TR");
+    const el = $("log");
+    el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+  }
+
+  function setHealth(ok, text){
+    const dot = $("healthDot");
+    const t = $("healthText");
+    dot.classList.remove("ok","bad","warn");
+    dot.classList.add(ok ? "ok" : "bad");
+    t.textContent = text;
+  }
+
+  function syncSelected(){
+    $("selCount").textContent = String(state.selected.size);
+    $("selectedBarcodes").value = Array.from(state.selected).join(", ");
+  }
+
+  function escapeHtml(str){
+    return String(str ?? "").replace(/[&<>"']/g, s => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+    }[s]));
+  }
+
+  async function apiFetch(url, options){
+    const r = await fetch(url, options);
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+
+    let data;
+    if (ct.includes("application/json")) data = await r.json();
+    else data = await r.text();
+
+    return { ok: r.ok, status: r.status, data };
+  }
+
+  async function checkHealth(){
+    const r = await apiFetch("/health");
+    if (r.ok) {
+      const text = typeof r.data === "string" ? r.data : (r.data?.status || "ok");
+      setHealth(true, text);
+    } else {
+      setHealth(false, "offline");
+    }
+  }
+
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      tab.classList.add("active");
+
+      const name = tab.dataset.tab;
+      $("tab-products").style.display = (name==="products") ? "" : "none";
+      $("tab-orders").style.display   = (name==="orders")   ? "" : "none";
+      $("tab-tools").style.display    = (name==="tools")    ? "" : "none";
+      $("tab-debug").style.display    = (name==="debug")    ? "" : "none";
+    });
+  });
+
+  function productMatches(p, q){
+    if (!q) return true;
+    q = q.toLowerCase();
+    const title = (p.title || "").toLowerCase();
+    const barcode = (p.barcode || "").toLowerCase();
+    const stockCode = (p.stockCode || "").toLowerCase();
+    return title.includes(q) || barcode.includes(q) || stockCode.includes(q);
+  }
+
+  function renderProducts(){
+    const tbody = $("productsTbody");
+    tbody.innerHTML = "";
+    const q = $("q").value.trim();
+
+    const rows = state.products.filter(p => productMatches(p, q));
+
+    for (const p of rows){
+      const tr = document.createElement("tr");
+
+      const td0 = document.createElement("td");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.selected.has(p.barcode);
+      cb.addEventListener("change", () => {
+        if (!p.barcode) return;
+        if (cb.checked) state.selected.add(p.barcode);
+        else state.selected.delete(p.barcode);
+        syncSelected();
+      });
+      td0.appendChild(cb);
+
+      const td1 = document.createElement("td");
+      td1.innerHTML = `
+        <div class="title">${escapeHtml(p.title || "-")}</div>
+        <div class="subline">stockCode: <span class="mono">${escapeHtml(p.stockCode || "-")}</span></div>
+      `;
+
+      const td2 = document.createElement("td");
+      td2.innerHTML = `<div class="mono">${escapeHtml(p.barcode || "-")}</div>`;
+
+      const td3 = document.createElement("td");
+      td3.innerHTML = `<div class="mono">${escapeHtml(p.quantity ?? "-")}</div>`;
+
+      const td4 = document.createElement("td");
+      td4.innerHTML = `<div class="mono">${escapeHtml(p.salePrice ?? "-")}</div>`;
+
+      const td5 = document.createElement("td");
+      td5.innerHTML = `<div class="mono">${escapeHtml(p.listPrice ?? "-")}</div>`;
+
+      tr.appendChild(td0);
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tr.appendChild(td3);
+      tr.appendChild(td4);
+      tr.appendChild(td5);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  // ✅ KRİTİK FIX: backend hangi formatta dönerse dönsün ürün listesini yakala
+  function normalizeProductsResponse(data){
+    // 1) Direkt array döndüyse
+    if (Array.isArray(data)) return data;
+
+    // 2) wrapper ise
+    if (data && typeof data === "object"){
+      if (Array.isArray(data.content)) return data.content;
+      if (Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data.products)) return data.products;
+      if (Array.isArray(data.data)) return data.data;
+
+      // 3) data.content tek obje ise (bazı implementasyonlar)
+      if (data.content && typeof data.content === "object" && !Array.isArray(data.content)) {
+        // content bir "product object" gibi görünüyorsa
+        if ("barcode" in data.content || "title" in data.content || "stockCode" in data.content) {
+          return [data.content];
+        }
+      }
+
+      // 4) Tek ürün objesi döndüyse
+      if ("barcode" in data || "title" in data || "stockCode" in data) {
+        return [data];
+      }
+    }
+
+    return [];
+  }
+
+  async function loadProducts(){
+    const page = $("page").value;
+    const size = $("size").value;
+    const archived = $("archived").value;
+
+    $("pageInfo").textContent = `${page} / size ${size}`;
+
+    const url = (archived === "")
+      ? `/api/products?page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`
+      : `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
+
+    addLog(`Ürünler getiriliyor: ${url}`);
+
+    const r = await apiFetch(url);
+    state.lastProductsResponse = r.data;
+    setOut(r.data);
+
+    if (!r.ok){
+      addLog(`Ürünler hata: ${r.status}`);
+      state.products = [];
+      renderProducts();
+      return;
+    }
+
+    const products = normalizeProductsResponse(r.data);
+    state.products = products;
+
+    addLog(`Ürünler geldi: ${state.products.length} kayıt`);
+    renderProducts();
+  }
+
+  function parseSelectedBarcodes(){
+    return Array.from(state.selected).filter(Boolean);
+  }
+
+  async function runBarcodesAction(url, body){
+    const r = await apiFetch(url, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(body)
+    });
+    setOut(r.data);
+    addLog(`${url} -> status ${r.status}`);
+    return r;
+  }
+
+  async function actionArchive(isArchive){
+    const barcodes = parseSelectedBarcodes();
+    if (!barcodes.length) return addLog("Seçili barkod yok.");
+    const url = isArchive ? "/api/products/archive" : "/api/products/unarchive";
+    await runBarcodesAction(url, { barcodes });
+  }
+
+  async function actionDisable(){
+    const barcodes = parseSelectedBarcodes();
+    if (!barcodes.length) return addLog("Seçili barkod yok.");
+    await runBarcodesAction("/api/products/disable", { barcodes });
+  }
+
+  async function actionEnable(){
+    const barcodes = parseSelectedBarcodes();
+    if (!barcodes.length) return addLog("Seçili barkod yok.");
+    const defaultQuantity = $("defaultQty").value.trim();
+    const body = { barcodes };
+    if (defaultQuantity !== "") body.defaultQuantity = Number(defaultQuantity);
+    await runBarcodesAction("/api/products/enable", body);
+  }
+
+  async function updateTitle(){
+    const barcode = $("up_barcode").value.trim();
+    const title = $("up_title").value.trim();
+    if (!barcode) return addLog("Title update: barcode boş.");
+    if (!title) return addLog("Title update: title boş.");
+
+    const r = await apiFetch("/api/products/update-title", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ barcode, title })
+    });
+    setOut(r.data);
+    addLog(`/api/products/update-title -> status ${r.status}`);
+  }
+
+  function pickOrderId(o){
+    return o?.id || o?.orderNumber || o?.shipmentPackageId || o?.packageId || "-";
+  }
+  function pickOrderStatus(o){
+    return o?.status || o?.shipmentPackageStatus || o?.state || "-";
+  }
+  function pickOrderDate(o){
+    return o?.orderDate || o?.createdDate || o?.shipmentDate || o?.lastModifiedDate || "-";
+  }
+  function pickOrderSummary(o){
+    const cargo = o?.cargoTrackingNumber || o?.cargoTrackingLink || "";
+    const cust = [o?.customerFirstName, o?.customerLastName].filter(Boolean).join(" ");
+    const price = o?.totalPrice ?? o?.total ?? o?.price ?? "";
+    const parts = [];
+    if (cust) parts.push(cust);
+    if (price !== "") parts.push(`₺${price}`);
+    if (cargo) parts.push(`kargo: ${cargo}`);
+    return parts.join(" | ") || "-";
+  }
+
+  function renderOrders(list){
+    const tbody = $("ordersTbody");
+    tbody.innerHTML = "";
+    for (const o of list){
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(pickOrderSummary(o))}</td>
+        <td class="mono">${escapeHtml(pickOrderId(o))}</td>
+        <td>${escapeHtml(pickOrderStatus(o))}</td>
+        <td class="mono">${escapeHtml(pickOrderDate(o))}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  async function loadOrders(){
+    const startDate = $("startDate").value.trim();
+    const endDate = $("endDate").value.trim();
+    const status = $("status").value.trim();
+
+    const params = new URLSearchParams();
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    if (status) params.set("status", status);
+
+    const url = "/api/orders?" + params.toString();
+    addLog(`Siparişler getiriliyor: ${url}`);
+
+    const r = await apiFetch(url);
+    state.lastOrdersResponse = r.data;
+    setOut(r.data);
+
+    if (!r.ok){
+      addLog(`Siparişler hata: ${r.status}`);
+      renderOrders([]);
+      return;
+    }
+
+    const list = Array.isArray(r.data) ? r.data : (r.data?.content || []);
+    const arr = Array.isArray(list) ? list : [];
+    addLog(`Siparişler geldi: ${arr.length} kayıt`);
+    renderOrders(arr);
+  }
+
+  async function backupSet(){
+    const barcode = $("bk_barcode").value.trim();
+    const quantity = Number($("bk_qty").value);
+    if (!barcode) return addLog("Backup set: barcode boş.");
+    if (!Number.isFinite(quantity)) return addLog("Backup set: quantity sayı olmalı.");
+
+    const r = await apiFetch("/api/backup/set", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ barcode, quantity })
+    });
+    setOut(r.data);
+    addLog(`/api/backup/set -> status ${r.status}`);
+  }
+
+  async function inventoryOne(){
+    const barcode = $("inv_barcode").value.trim();
+    const quantity = Number($("inv_qty").value);
+    const salePrice = Number($("inv_sale").value);
+    const listPrice = Number($("inv_list").value);
+
+    if (!barcode) return addLog("Inventory: barcode boş.");
+
+    const payload = { items:[{ barcode, quantity, salePrice, listPrice }] };
+
+    const r = await apiFetch("/api/inventory/price-and-stock", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    setOut(r.data);
+    addLog(`/api/inventory/price-and-stock -> status ${r.status}`);
+  }
+
+  function parseBulkLines(text){
+    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const items = [];
+    for (const line of lines){
+      const parts = line.split(";").map(x => x.trim());
+      if (parts.length < 4) throw new Error(`Hatalı satır: ${line}`);
+      const [barcode, qtyStr, saleStr, listStr] = parts;
+      const quantity = Number(qtyStr);
+      const salePrice = Number(String(saleStr).replace(",", "."));
+      const listPrice = Number(String(listStr).replace(",", "."));
+      if (!barcode) throw new Error(`Barcode boş: ${line}`);
+      if (!Number.isFinite(quantity) || !Number.isFinite(salePrice) || !Number.isFinite(listPrice)) {
+        throw new Error(`Sayı parse edilemedi: ${line}`);
+      }
+      items.push({ barcode, quantity, salePrice, listPrice });
+    }
+    return items;
+  }
+
+  async function inventoryBulk(){
+    try{
+      const items = parseBulkLines($("bulkLines").value);
+      if (!items.length) return addLog("Toplu: satır yok.");
+
+      const r = await apiFetch("/api/inventory/price-and-stock", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ items })
+      });
+
+      setOut(r.data);
+      addLog(`Toplu price&stock -> status ${r.status} (items=${items.length})`);
+    }catch(e){
+      addLog(`Toplu parse hata: ${e.message}`);
+    }
+  }
+
+  function bulkFromSelected(){
+    const barcodes = Array.from(state.selected);
+    if (!barcodes.length) return addLog("Seçili barkod yok.");
+    $("bulkLines").value = barcodes.map(b => `${b};0;0;0`).join("\n");
+    addLog("Seçililerden şablon yazıldı (qty/sale/list doldur).");
+  }
+
+  $("btnLoadProducts").addEventListener("click", loadProducts);
+  $("btnClearSel").addEventListener("click", () => { state.selected.clear(); syncSelected(); renderProducts(); });
+  $("q").addEventListener("input", renderProducts);
+
+  $("btnDisable").addEventListener("click", actionDisable);
+  $("btnEnable").addEventListener("click", actionEnable);
+  $("btnArchive").addEventListener("click", () => actionArchive(true));
+  $("btnUnarchive").addEventListener("click", () => actionArchive(false));
+
+  $("btnUpdateTitle").addEventListener("click", updateTitle);
+
+  $("btnLoadOrders").addEventListener("click", loadOrders);
+
+  $("btnBackupSet").addEventListener("click", backupSet);
+  $("btnInventoryOne").addEventListener("click", inventoryOne);
+  $("btnInventoryBulk").addEventListener("click", inventoryBulk);
+  $("btnBulkFromSelected").addEventListener("click", bulkFromSelected);
+
+  $("btnAddBarcode").addEventListener("click", () => {
+    const v = $("addBarcode").value.trim();
+    if (!v) return;
+    state.selected.add(v);
+    $("addBarcode").value = "";
+    syncSelected();
+  });
+  $("addBarcode").addEventListener("keydown", (e) => {
+    if (e.key === "Enter"){
+      e.preventDefault();
+      $("btnAddBarcode").click();
+    }
+  });
+
+  checkHealth();
+  syncSelected();
+</script>
+</body>
+</html>
