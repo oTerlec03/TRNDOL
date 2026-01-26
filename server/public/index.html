@@ -285,23 +285,6 @@
           <button class="btn" id="btnClearSel">Seçimi Temizle</button>
         </div>
 
-        <div class="toolbar stickyActions">
-          <span class="badge">Seçili barkodlarla hızlı işlem</span>
-          <button class="btn red" id="btnDisable">Pasif Et (qty=0)</button>
-          <button class="btn green" id="btnEnable">Aktif Et</button>
-          <button class="btn amber" id="btnArchive">Arşivle</button>
-          <button class="btn" id="btnUnarchive">Arşivden Çıkar</button>
-
-          <div style="display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap">
-            <label style="margin:0; color:var(--muted); font-size:12px">Aktif ederken default qty (ops.)</label>
-            <input id="defaultQty" type="number" placeholder="örn: 10" style="width:120px"/>
-          </div>
-        </div>
-
-        <div class="hint">
-          Not: Pasif/Aktif işlemleri stok üzerinden çalışır (quantity). Arşiv farklıdır.
-        </div>
-
         <div style="margin-top:12px; overflow:auto">
           <table>
             <thead>
@@ -339,6 +322,23 @@
 
         <div class="hint">
           Tabloda görünmese bile buraya eklediğin barkodlarla işlem yapılabilir (endpoint’ler barkod listesi alıyor).
+        </div>
+
+        <div class="toolbar stickyActions">
+          <span class="badge">Seçili barkodlarla hızlı işlem</span>
+          <button class="btn red" id="btnDisable">Pasif Et (qty=0)</button>
+          <button class="btn green" id="btnEnable">Aktif Et</button>
+          <button class="btn amber" id="btnArchive">Arşivle</button>
+          <button class="btn" id="btnUnarchive">Arşivden Çıkar</button>
+
+          <div style="display:flex; gap:8px; align-items:center; margin-left:auto; flex-wrap:wrap">
+            <label style="margin:0; color:var(--muted); font-size:12px">Aktif ederken default qty (ops.)</label>
+            <input id="defaultQty" type="number" placeholder="örn: 10" style="width:120px"/>
+          </div>
+        </div>
+
+        <div class="hint">
+          Not: Pasif/Aktif işlemleri stok üzerinden çalışır (quantity). Arşiv farklıdır.
         </div>
 
         <h2 style="margin-top:14px">Hızlı Title Update</h2>
