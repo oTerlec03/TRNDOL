@@ -61,6 +61,23 @@
       flex-wrap:wrap;
       align-items:center;
     }
+    .status-row{
+      display:flex;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+      width:100%;
+    }
+    .status-controls{
+      margin-left:auto;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .status-controls label{
+      margin:0;
+      font-size:11px;
+    }
     .status-tab{
       cursor:pointer;
       padding:8px 10px;
@@ -87,6 +104,51 @@
       font-size:11px;
       color:var(--muted);
       margin-top:4px;
+    }
+    .status-subfilters{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:10px;
+    }
+    .status-subfilters label{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .status-subfilters input{
+      width:auto;
+    }
+    .pagination-row{
+      margin-top:12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .pagination-row .page-links{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .page-link{
+      cursor:pointer;
+      padding:6px 8px;
+      border-radius:8px;
+      border:1px solid rgba(35,51,90,.7);
+      background:rgba(15,23,48,.35);
+      color:var(--muted);
+      user-select:none;
+    }
+    .page-link.active{
+      border-color:rgba(44,116,255,.55);
+      color:var(--text);
     }
     .tab{
       cursor:pointer;
@@ -249,7 +311,7 @@
         <h2>Ürün Listeleme</h2>
 
         <div class="row">
-          <div style="width:100%">
+          <div class="status-row">
             <div class="status-tabs" aria-label="Ürün durum sekmeleri">
               <div class="status-tab active" data-status="all">
                 <span class="label">Tüm Ürünler</span>
@@ -268,25 +330,14 @@
                 <span class="count" data-count="passive">0 Ürün(ler)</span>
               </div>
             </div>
+            <div class="status-controls">
+              <label for="size">Size</label>
+              <input id="size" type="number" value="50" min="1" style="width:90px"/>
+            </div>
           </div>
-          <div style="width:120px">
-            <label>Page</label>
-            <input id="page" type="number" value="0" min="0"/>
-          </div>
-          <div style="width:120px">
-            <label>Size</label>
-            <input id="size" type="number" value="50" min="1"/>
-          </div>
-          <div style="width:180px">
-            <label>Arşiv Filtresi</label>
-            <select id="archived">
-              <option value="">(Filtre yok)</option>
-              <option value="false">Arşivsiz</option>
-              <option value="true">Arşivli</option>
-            </select>
-          </div>
-          <div style="flex:1; min-width:260px">
-            <label>Arama (title / barcode / stockCode)</label>
+          <div id="statusSubfilters" class="status-subfilters" aria-label="Durum alt filtreleri"></div>
+          <div style="flex:1; min-width:320px">
+            <label>Arama (Barkod, Kod, Stok Kod veya Ürün Adı)</label>
             <input id="q" placeholder="örn: CLH..., 869..., mandren, matkap ucu..."/>
           </div>
 
@@ -308,6 +359,11 @@
             </thead>
             <tbody id="productsTbody"></tbody>
           </table>
+        </div>
+        <div class="pagination-row">
+          <div class="page-links" id="pageLinks" aria-label="Sayfa numaraları"></div>
+          <label for="page">Page</label>
+          <input id="page" type="number" value="0" min="0" style="width:90px"/>
         </div>
       </div>
 
@@ -480,6 +536,7 @@
     products: [],
     selected: new Set(),
     statusFilter: "all",
+    subStatusFilter: "all",
     lastProductsResponse: null,
     lastOrdersResponse: null
   };
@@ -549,11 +606,44 @@
     });
   });
 
+  const subfiltersByStatus = {
+    active: ["Tümü", "Buybox Dahil Olanlar", "Buybox Dahil Olmayanlar"],
+    approval: ["Tümü", "Onay Bekleyenler", "Revize Yapmanız Gerekenler"],
+    passive: ["Tümü", "Tükenenler", "Fiyat Girilmesi Gerekenler", "Kilitliler", "Arşivdekiler", "Satışa Kapatılanlar"]
+  };
+
+  function renderSubfilters(){
+    const wrap = $("statusSubfilters");
+    wrap.innerHTML = "";
+    const items = subfiltersByStatus[state.statusFilter] || [];
+    if (!items.length) return;
+    items.forEach((label, index) => {
+      const id = `subfilter-${state.statusFilter}-${index}`;
+      const item = document.createElement("label");
+      item.innerHTML = `
+        <input type="checkbox" data-subfilter="${label}" id="${id}">
+        <span>${label}</span>
+      `;
+      const checkbox = item.querySelector("input");
+      checkbox.checked = label === "Tümü";
+      checkbox.addEventListener("change", () => {
+        if (!checkbox.checked) return;
+        state.subStatusFilter = label;
+        wrap.querySelectorAll("input").forEach(el => {
+          if (el !== checkbox) el.checked = false;
+        });
+      });
+      wrap.appendChild(item);
+    });
+  }
+
   document.querySelectorAll(".status-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".status-tab").forEach(x => x.classList.remove("active"));
       tab.classList.add("active");
       state.statusFilter = tab.dataset.status || "all";
+      state.subStatusFilter = "all";
+      renderSubfilters();
       renderProducts();
     });
   });
@@ -714,13 +804,10 @@
   async function loadProducts(){
     const page = $("page").value;
     const size = $("size").value;
-    const archived = $("archived").value;
 
     $("pageInfo").textContent = `${page} / size ${size}`;
 
-    const url = (archived === "")
-      ? `/api/products?page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`
-      : `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
+    const url = `/api/products?page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
 
     addLog(`Ürünler getiriliyor: ${url}`);
 
@@ -970,8 +1057,36 @@
     }
   });
 
+  function renderPageLinks(){
+    const wrap = $("pageLinks");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const current = Number($("page").value) || 0;
+    for (let i = 1; i <= 10; i += 1){
+      const btn = document.createElement("span");
+      btn.className = "page-link" + (current === i - 1 ? " active" : "");
+      btn.textContent = String(i);
+      btn.addEventListener("click", () => {
+        $("page").value = String(i - 1);
+        renderPageLinks();
+      });
+      wrap.appendChild(btn);
+    }
+    const next = document.createElement("span");
+    next.className = "page-link";
+    next.textContent = ">";
+    const last = document.createElement("span");
+    last.className = "page-link";
+    last.textContent = ">>";
+    wrap.appendChild(next);
+    wrap.appendChild(last);
+  }
+
   checkHealth();
   syncSelected();
+  renderSubfilters();
+  renderPageLinks();
+  loadProducts();
 </script>
 </body>
 </html>
