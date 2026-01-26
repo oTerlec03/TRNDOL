@@ -163,6 +163,15 @@
     }
     .title{font-weight:800; margin-bottom:4px}
     .subline{font-size:12px; color:var(--muted)}
+    .product-image{
+      width:56px;
+      height:56px;
+      border-radius:10px;
+      object-fit:cover;
+      border:1px solid rgba(35,51,90,.75);
+      background:rgba(12,18,36,.7);
+      display:block;
+    }
     .badge{
       display:inline-flex; gap:6px; align-items:center;
       padding:6px 10px; border-radius:999px;
@@ -290,11 +299,11 @@
             <thead>
               <tr>
                 <th style="width:44px"></th>
+                <th style="width:76px">Görsel</th>
                 <th>Ürün</th>
                 <th style="width:240px">Barcode</th>
                 <th style="width:120px">Qty</th>
                 <th style="width:120px">Sale</th>
-                <th style="width:120px">List</th>
               </tr>
             </thead>
             <tbody id="productsTbody"></tbody>
@@ -636,22 +645,31 @@
       td0.appendChild(cb);
 
       const td1 = document.createElement("td");
-      td1.innerHTML = `
+      const img = document.createElement("img");
+      const imgSrc = p?.imageUrl || p?.image || p?.imageUrlLarge || p?.imageUrlMedium || p?.imageUrlSmall || p?.images?.[0]?.url || "";
+      img.className = "product-image";
+      img.alt = p?.title ? `Görsel: ${p.title}` : "Ürün görseli";
+      if (imgSrc) {
+        img.src = imgSrc;
+      } else {
+        img.style.opacity = "0.35";
+      }
+      td1.appendChild(img);
+
+      const td2 = document.createElement("td");
+      td2.innerHTML = `
         <div class="title">${escapeHtml(p.title || "-")}</div>
         <div class="subline">stockCode: <span class="mono">${escapeHtml(p.stockCode || "-")}</span></div>
       `;
 
-      const td2 = document.createElement("td");
-      td2.innerHTML = `<div class="mono">${escapeHtml(p.barcode || "-")}</div>`;
-
       const td3 = document.createElement("td");
-      td3.innerHTML = `<div class="mono">${escapeHtml(p.quantity ?? "-")}</div>`;
+      td3.innerHTML = `<div class="mono">${escapeHtml(p.barcode || "-")}</div>`;
 
       const td4 = document.createElement("td");
-      td4.innerHTML = `<div class="mono">${escapeHtml(p.salePrice ?? "-")}</div>`;
+      td4.innerHTML = `<div class="mono">${escapeHtml(p.quantity ?? "-")}</div>`;
 
       const td5 = document.createElement("td");
-      td5.innerHTML = `<div class="mono">${escapeHtml(p.listPrice ?? "-")}</div>`;
+      td5.innerHTML = `<div class="mono">${escapeHtml(p.salePrice ?? "-")}</div>`;
 
       tr.appendChild(td0);
       tr.appendChild(td1);
