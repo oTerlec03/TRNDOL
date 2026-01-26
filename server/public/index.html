@@ -55,6 +55,39 @@
       margin-top:12px;
       display:flex; gap:8px; flex-wrap:wrap;
     }
+    .status-tabs{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .status-tab{
+      cursor:pointer;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(35,51,90,.8);
+      background:rgba(15,23,48,.45);
+      color:var(--muted);
+      font-size:12px;
+      user-select:none;
+    }
+    .status-tab.active{
+      background:rgba(44,116,255,.14);
+      border-color:rgba(44,116,255,.55);
+      color:var(--text);
+    }
+    .status-tab .label{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-weight:600;
+    }
+    .status-tab .count{
+      display:block;
+      font-size:11px;
+      color:var(--muted);
+      margin-top:4px;
+    }
     .tab{
       cursor:pointer;
       padding:10px 12px; border-radius:12px;
@@ -207,6 +240,26 @@
         <h2>Ürün Listeleme</h2>
 
         <div class="row">
+          <div style="width:100%">
+            <div class="status-tabs" aria-label="Ürün durum sekmeleri">
+              <div class="status-tab active" data-status="all">
+                <span class="label">Tüm Ürünler</span>
+                <span class="count" data-count="all">0 Ürün(ler)</span>
+              </div>
+              <div class="status-tab" data-status="active">
+                <span class="label">Aktif Ürünler</span>
+                <span class="count" data-count="active">0 Ürün(ler)</span>
+              </div>
+              <div class="status-tab" data-status="approval">
+                <span class="label">Onay Sürecindeki Ürünler</span>
+                <span class="count" data-count="approval">0 Ürün(ler)</span>
+              </div>
+              <div class="status-tab" data-status="passive">
+                <span class="label">Pasif Ürünler</span>
+                <span class="count" data-count="passive">0 Ürün(ler)</span>
+              </div>
+            </div>
+          </div>
           <div style="width:120px">
             <label>Page</label>
             <input id="page" type="number" value="0" min="0"/>
@@ -417,6 +470,7 @@
   const state = {
     products: [],
     selected: new Set(),
+    statusFilter: "all",
     lastProductsResponse: null,
     lastOrdersResponse: null
   };
@@ -486,6 +540,29 @@
     });
   });
 
+  document.querySelectorAll(".status-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".status-tab").forEach(x => x.classList.remove("active"));
+      tab.classList.add("active");
+      state.statusFilter = tab.dataset.status || "all";
+      renderProducts();
+    });
+  });
+
+  function getProductStatusKey(p){
+    const status = String(p?.status || p?.approvalStatus || p?.approvedStatus || "").toLowerCase();
+    if (typeof p?.approved === "boolean") return p.approved ? "active" : "approval";
+    if (status){
+      if (status.includes("approved") || status.includes("active") || status.includes("aktif")) return "active";
+      if (status.includes("pending") || status.includes("waiting") || status.includes("review") || status.includes("onay")) return "approval";
+      if (status.includes("passive") || status.includes("inactive") || status.includes("pasif")) return "passive";
+    }
+    if (Number.isFinite(p?.quantity)){
+      return p.quantity > 0 ? "active" : "passive";
+    }
+    return "all";
+  }
+
   function productMatches(p, q){
     if (!q) return true;
     q = q.toLowerCase();
@@ -495,12 +572,53 @@
     return title.includes(q) || barcode.includes(q) || stockCode.includes(q);
   }
 
+  function computeStatusCounts(list){
+    const counts = { all: list.length, active: 0, approval: 0, passive: 0 };
+    for (const p of list){
+      const status = String(p?.status || p?.approvalStatus || p?.approvedStatus || "").toLowerCase();
+      if (typeof p?.approved === "boolean"){
+        if (p.approved) counts.active += 1;
+        else counts.approval += 1;
+        continue;
+      }
+      if (status){
+        if (status.includes("approved") || status.includes("active") || status.includes("aktif")) {
+          counts.active += 1;
+        } else if (status.includes("pending") || status.includes("waiting") || status.includes("review") || status.includes("onay")) {
+          counts.approval += 1;
+        } else if (status.includes("passive") || status.includes("inactive") || status.includes("pasif")) {
+          counts.passive += 1;
+        }
+        continue;
+      }
+      if (Number.isFinite(p?.quantity)){
+        if (p.quantity > 0) counts.active += 1;
+        else counts.passive += 1;
+      }
+    }
+    return counts;
+  }
+
+  function updateStatusCounts(list){
+    const counts = computeStatusCounts(list);
+    document.querySelectorAll(".status-tab .count").forEach(el => {
+      const key = el.dataset.count;
+      if (!key) return;
+      const value = counts[key] ?? 0;
+      el.textContent = `${value} Ürün(ler)`;
+    });
+  }
+
   function renderProducts(){
     const tbody = $("productsTbody");
     tbody.innerHTML = "";
     const q = $("q").value.trim();
 
-    const rows = state.products.filter(p => productMatches(p, q));
+    const rows = state.products.filter(p => {
+      if (!productMatches(p, q)) return false;
+      if (state.statusFilter === "all") return true;
+      return getProductStatusKey(p) === state.statusFilter;
+    });
 
     for (const p of rows){
       const tr = document.createElement("tr");
@@ -604,6 +722,7 @@
 
     addLog(`Ürünler geldi: ${state.products.length} kayıt`);
     renderProducts();
+    updateStatusCounts(state.products);
   }
 
   function parseSelectedBarcodes(){
