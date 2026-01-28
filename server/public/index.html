@@ -745,6 +745,10 @@
   function computeStatusCounts(list, totalCount){
     const counts = { all: Number.isFinite(totalCount) ? totalCount : list.length, active: 0, approval: 0, passive: 0 };
     for (const p of list){
+      if (isArchivedProduct(p)) {
+        counts.passive += 1;
+        continue;
+      }
       const status = String(p?.status || p?.approvalStatus || p?.approvedStatus || "").toLowerCase();
       if (typeof p?.approved === "boolean"){
         if (p.approved) counts.active += 1;
@@ -786,8 +790,8 @@
 
     const rows = state.products.filter(p => {
       if (!productMatches(p, q)) return false;
-      if (state.statusFilter !== "all" && isArchivedProduct(p) && state.subStatusFilter !== "Arşivdekiler") {
-        return false;
+      if (isArchivedProduct(p)) {
+        return state.statusFilter === "passive" && state.subStatusFilter === "Arşivdekiler";
       }
       if (state.statusFilter === "all") return true;
       if (getProductStatusKey(p) !== state.statusFilter) return false;
