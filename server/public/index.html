@@ -537,6 +537,7 @@
     selected: new Set(),
     statusFilter: "all",
     subStatusFilter: "all",
+    archivedFilter: "false",
     lastProductsResponse: null,
     lastOrdersResponse: null
   };
@@ -612,6 +613,10 @@
     passive: ["Tümü", "Tükenenler", "Fiyat Girilmesi Gerekenler", "Kilitliler", "Arşivdekiler", "Satışa Kapatılanlar"]
   };
 
+  function shouldUseArchivedFilter(){
+    return state.statusFilter === "passive" && state.subStatusFilter === "Arşivdekiler";
+  }
+
   function renderSubfilters(){
     const wrap = $("statusSubfilters");
     wrap.innerHTML = "";
@@ -632,6 +637,12 @@
         wrap.querySelectorAll("input").forEach(el => {
           if (el !== checkbox) el.checked = false;
         });
+        const nextArchivedFilter = shouldUseArchivedFilter() ? "true" : "false";
+        if (state.archivedFilter !== nextArchivedFilter) {
+          state.archivedFilter = nextArchivedFilter;
+          loadProducts();
+          return;
+        }
         renderProducts();
       });
       wrap.appendChild(item);
@@ -644,6 +655,7 @@
       tab.classList.add("active");
       state.statusFilter = tab.dataset.status || "all";
       state.subStatusFilter = "all";
+      state.archivedFilter = shouldUseArchivedFilter() ? "true" : "false";
       renderSubfilters();
       renderProducts();
     });
@@ -895,7 +907,8 @@
 
     $("pageInfo").textContent = `${page} / size ${size}`;
 
-    const url = `/api/products?page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
+    const archived = state.archivedFilter;
+    const url = `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
 
     addLog(`Ürünler getiriliyor: ${url}`);
 
