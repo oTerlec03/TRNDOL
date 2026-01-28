@@ -632,6 +632,7 @@
         wrap.querySelectorAll("input").forEach(el => {
           if (el !== checkbox) el.checked = false;
         });
+        renderProducts();
       });
       wrap.appendChild(item);
     });
@@ -662,6 +663,76 @@
     return "all";
   }
 
+  function isArchivedProduct(p){
+    if (typeof p?.archived === "boolean") return p.archived;
+    if (typeof p?.isArchived === "boolean") return p.isArchived;
+    const status = String(p?.status || p?.state || p?.approvalStatus || "").toLowerCase();
+    return status.includes("archiv") || status.includes("arşiv");
+  }
+
+  function isLockedProduct(p){
+    if (typeof p?.locked === "boolean") return p.locked;
+    if (typeof p?.isLocked === "boolean") return p.isLocked;
+    const status = String(p?.status || p?.state || "").toLowerCase();
+    return status.includes("locked") || status.includes("kilit");
+  }
+
+  function isSalesClosedProduct(p){
+    if (typeof p?.salesClosed === "boolean") return p.salesClosed;
+    if (typeof p?.saleClosed === "boolean") return p.saleClosed;
+    const status = String(p?.status || p?.state || "").toLowerCase();
+    return status.includes("closed") || status.includes("satışa kapat");
+  }
+
+  function needsPriceProduct(p){
+    const price = Number(p?.salePrice ?? p?.price ?? p?.sale ?? NaN);
+    return Number.isFinite(price) ? price <= 0 : true;
+  }
+
+  function isOutOfStockProduct(p){
+    if (Number.isFinite(p?.quantity)) return p.quantity <= 0;
+    return false;
+  }
+
+  function isBuyboxIncluded(p){
+    if (typeof p?.buybox === "boolean") return p.buybox;
+    if (typeof p?.isBuybox === "boolean") return p.isBuybox;
+    if (typeof p?.buyBoxWinner === "boolean") return p.buyBoxWinner;
+    const status = String(p?.status || "").toLowerCase();
+    return status.includes("buybox");
+  }
+
+  function needsRevisionProduct(p){
+    const status = String(p?.status || p?.approvalStatus || "").toLowerCase();
+    return status.includes("revize") || status.includes("revision");
+  }
+
+  function isAwaitingApprovalProduct(p){
+    const status = String(p?.status || p?.approvalStatus || "").toLowerCase();
+    return status.includes("onay") || status.includes("pending") || status.includes("waiting") || status.includes("review");
+  }
+
+  function matchesSubStatus(p){
+    const label = state.subStatusFilter;
+    if (label === "Tümü") return true;
+    if (state.statusFilter === "passive") {
+      if (label === "Tükenenler") return isOutOfStockProduct(p);
+      if (label === "Fiyat Girilmesi Gerekenler") return needsPriceProduct(p);
+      if (label === "Kilitliler") return isLockedProduct(p);
+      if (label === "Arşivdekiler") return isArchivedProduct(p);
+      if (label === "Satışa Kapatılanlar") return isSalesClosedProduct(p);
+    }
+    if (state.statusFilter === "approval") {
+      if (label === "Onay Bekleyenler") return isAwaitingApprovalProduct(p);
+      if (label === "Revize Yapmanız Gerekenler") return needsRevisionProduct(p);
+    }
+    if (state.statusFilter === "active") {
+      if (label === "Buybox Dahil Olanlar") return isBuyboxIncluded(p);
+      if (label === "Buybox Dahil Olmayanlar") return !isBuyboxIncluded(p);
+    }
+    return true;
+  }
+
   function productMatches(p, q){
     if (!q) return true;
     q = q.toLowerCase();
@@ -671,8 +742,8 @@
     return title.includes(q) || barcode.includes(q) || stockCode.includes(q);
   }
 
-  function computeStatusCounts(list){
-    const counts = { all: list.length, active: 0, approval: 0, passive: 0 };
+  function computeStatusCounts(list, totalCount){
+    const counts = { all: Number.isFinite(totalCount) ? totalCount : list.length, active: 0, approval: 0, passive: 0 };
     for (const p of list){
       const status = String(p?.status || p?.approvalStatus || p?.approvedStatus || "").toLowerCase();
       if (typeof p?.approved === "boolean"){
@@ -698,8 +769,8 @@
     return counts;
   }
 
-  function updateStatusCounts(list){
-    const counts = computeStatusCounts(list);
+  function updateStatusCounts(list, totalCount){
+    const counts = computeStatusCounts(list, totalCount);
     document.querySelectorAll(".status-tab .count").forEach(el => {
       const key = el.dataset.count;
       if (!key) return;
@@ -715,8 +786,12 @@
 
     const rows = state.products.filter(p => {
       if (!productMatches(p, q)) return false;
+      if (state.statusFilter !== "all" && isArchivedProduct(p) && state.subStatusFilter !== "Arşivdekiler") {
+        return false;
+      }
       if (state.statusFilter === "all") return true;
-      return getProductStatusKey(p) === state.statusFilter;
+      if (getProductStatusKey(p) !== state.statusFilter) return false;
+      return matchesSubStatus(p);
     });
 
     for (const p of rows){
@@ -801,6 +876,15 @@
     return [];
   }
 
+  function extractTotalCount(data){
+    if (!data || typeof data !== "object") return null;
+    const candidates = [data.totalElements, data.totalCount, data.total, data.count];
+    for (const value of candidates){
+      if (Number.isFinite(value)) return value;
+    }
+    return null;
+  }
+
   async function loadProducts(){
     const page = $("page").value;
     const size = $("size").value;
@@ -823,11 +907,12 @@
     }
 
     const products = normalizeProductsResponse(r.data);
+    const totalCount = extractTotalCount(r.data);
     state.products = products;
 
     addLog(`Ürünler geldi: ${state.products.length} kayıt`);
     renderProducts();
-    updateStatusCounts(state.products);
+    updateStatusCounts(state.products, totalCount);
   }
 
   function parseSelectedBarcodes(){
@@ -1069,6 +1154,7 @@
       btn.addEventListener("click", () => {
         $("page").value = String(i - 1);
         renderPageLinks();
+        loadProducts();
       });
       wrap.appendChild(btn);
     }
