@@ -534,10 +534,13 @@
 
   const state = {
     products: [],
+    allProducts: [],
     selected: new Set(),
     statusFilter: "all",
     subStatusFilter: "all",
     archivedFilter: "false",
+    displaySize: 50,
+    filteredTotal: 0,
     lastProductsResponse: null,
     lastOrdersResponse: null
   };
@@ -800,7 +803,7 @@
     tbody.innerHTML = "";
     const q = $("q").value.trim();
 
-    const rows = state.products.filter(p => {
+    const rows = state.allProducts.filter(p => {
       if (!productMatches(p, q)) return false;
       if (isArchivedProduct(p)) {
         return state.statusFilter === "passive" && state.subStatusFilter === "Arşivdekiler";
@@ -810,7 +813,13 @@
       return matchesSubStatus(p);
     });
 
-    for (const p of rows){
+    state.filteredTotal = rows.length;
+    const pageIndex = Math.max(0, Number($("page").value) || 0);
+    const start = pageIndex * state.displaySize;
+    const end = start + state.displaySize;
+    const pagedRows = rows.slice(start, end);
+
+    for (const p of pagedRows){
       const tr = document.createElement("tr");
 
       const td0 = document.createElement("td");
@@ -861,6 +870,7 @@
 
       tbody.appendChild(tr);
     }
+    renderPageLinks();
   }
 
   // ✅ KRİTİK FIX: backend hangi formatta dönerse dönsün ürün listesini yakala
@@ -902,34 +912,41 @@
   }
 
   async function loadProducts(){
-    const page = $("page").value;
-    const size = $("size").value;
-
-    $("pageInfo").textContent = `${page} / size ${size}`;
-
     const archived = state.archivedFilter;
-    const url = `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(size)}`;
+    const batchSize = 200;
+    let page = 0;
+    let totalCount = null;
+    let all = [];
 
-    addLog(`Ürünler getiriliyor: ${url}`);
+    while (true) {
+      const url = `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(batchSize)}`;
+      addLog(`Ürünler getiriliyor: ${url}`);
+      const r = await apiFetch(url);
+      state.lastProductsResponse = r.data;
+      setOut(r.data);
 
-    const r = await apiFetch(url);
-    state.lastProductsResponse = r.data;
-    setOut(r.data);
+      if (!r.ok){
+        addLog(`Ürünler hata: ${r.status}`);
+        state.allProducts = [];
+        renderProducts();
+        return;
+      }
 
-    if (!r.ok){
-      addLog(`Ürünler hata: ${r.status}`);
-      state.products = [];
-      renderProducts();
-      return;
+      const products = normalizeProductsResponse(r.data);
+      const nextTotal = extractTotalCount(r.data);
+      if (Number.isFinite(nextTotal)) totalCount = nextTotal;
+
+      all = all.concat(products);
+      if (!products.length) break;
+      if (Number.isFinite(totalCount) && all.length >= totalCount) break;
+      if (products.length < batchSize) break;
+      page += 1;
     }
 
-    const products = normalizeProductsResponse(r.data);
-    const totalCount = extractTotalCount(r.data);
-    state.products = products;
-
-    addLog(`Ürünler geldi: ${state.products.length} kayıt`);
+    state.allProducts = all;
+    addLog(`Ürünler geldi: ${state.allProducts.length} kayıt`);
     renderProducts();
-    updateStatusCounts(state.products, totalCount);
+    updateStatusCounts(state.allProducts, totalCount);
   }
 
   function parseSelectedBarcodes(){
@@ -1130,6 +1147,12 @@
   $("btnLoadProducts").addEventListener("click", loadProducts);
   $("btnClearSel").addEventListener("click", () => { state.selected.clear(); syncSelected(); renderProducts(); });
   $("q").addEventListener("input", renderProducts);
+  $("page").addEventListener("input", renderProducts);
+  $("size").addEventListener("input", () => {
+    const nextSize = Math.max(1, Number($("size").value) || 1);
+    state.displaySize = nextSize;
+    renderProducts();
+  });
 
   $("btnDisable").addEventListener("click", actionDisable);
   $("btnEnable").addEventListener("click", actionEnable);
@@ -1163,30 +1186,36 @@
     const wrap = $("pageLinks");
     if (!wrap) return;
     wrap.innerHTML = "";
-    const current = Number($("page").value) || 0;
-    for (let i = 1; i <= 10; i += 1){
+    const current = Math.max(0, Number($("page").value) || 0);
+    const totalPages = Math.max(1, Math.ceil(state.filteredTotal / state.displaySize));
+    if (current >= totalPages) $("page").value = String(totalPages - 1);
+    const groupStart = Math.floor(current / 5) * 5;
+    const groupEnd = Math.min(totalPages, groupStart + 5);
+    for (let i = groupStart + 1; i <= groupEnd; i += 1){
       const btn = document.createElement("span");
-      btn.className = "page-link" + (current === i - 1 ? " active" : "");
+      btn.className = "page-link" + (Number($("page").value) === i - 1 ? " active" : "");
       btn.textContent = String(i);
       btn.addEventListener("click", () => {
         $("page").value = String(i - 1);
-        renderPageLinks();
-        loadProducts();
+        renderProducts();
       });
       wrap.appendChild(btn);
     }
-    const next = document.createElement("span");
-    next.className = "page-link";
-    next.textContent = ">";
-    const last = document.createElement("span");
-    last.className = "page-link";
-    last.textContent = ">>";
-    wrap.appendChild(next);
-    wrap.appendChild(last);
+    if (groupEnd < totalPages) {
+      const next = document.createElement("span");
+      next.className = "page-link";
+      next.textContent = ">";
+      next.addEventListener("click", () => {
+        $("page").value = String(groupEnd);
+        renderProducts();
+      });
+      wrap.appendChild(next);
+    }
   }
 
   checkHealth();
   syncSelected();
+  state.displaySize = Math.max(1, Number($("size").value) || 50);
   renderSubfilters();
   renderPageLinks();
   loadProducts();
