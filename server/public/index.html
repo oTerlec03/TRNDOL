@@ -431,11 +431,11 @@
       <div class="row">
         <div style="width:220px">
           <label>startDate (YYYY-MM-DD)</label>
-          <input id="startDate" placeholder="2026-01-01"/>
+          <input id="startDate" type="date" placeholder="2026-01-01"/>
         </div>
         <div style="width:220px">
           <label>endDate (YYYY-MM-DD)</label>
-          <input id="endDate" placeholder="2026-01-26"/>
+          <input id="endDate" type="date" placeholder="2026-01-26"/>
         </div>
         <div style="width:220px">
           <label>status (opsiyonel)</label>
@@ -809,6 +809,13 @@
         return state.statusFilter === "passive" && state.subStatusFilter === "Arşivdekiler";
       }
       if (state.statusFilter === "all") return true;
+      if (state.statusFilter === "passive") {
+        if (state.subStatusFilter === "Tümü") {
+          const passiveByStatus = getProductStatusKey(p) === "passive";
+          return passiveByStatus || isOutOfStockProduct(p) || needsPriceProduct(p) || isLockedProduct(p) || isSalesClosedProduct(p);
+        }
+        return matchesSubStatus(p);
+      }
       if (getProductStatusKey(p) !== state.statusFilter) return false;
       return matchesSubStatus(p);
     });
@@ -939,7 +946,6 @@
       all = all.concat(products);
       if (!products.length) break;
       if (Number.isFinite(totalCount) && all.length >= totalCount) break;
-      if (products.length < batchSize) break;
       page += 1;
     }
 
@@ -1059,7 +1065,9 @@
       return;
     }
 
-    const list = Array.isArray(r.data) ? r.data : (r.data?.content || []);
+    const list = Array.isArray(r.data)
+      ? r.data
+      : (r.data?.content || r.data?.data?.content || r.data?.data || []);
     const arr = Array.isArray(list) ? list : [];
     addLog(`Siparişler geldi: ${arr.length} kayıt`);
     renderOrders(arr);
