@@ -20,9 +20,20 @@ const PORT = process.env.PORT || 3000;
 const SELLER_ID = process.env.SELLER_ID;
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
+const STORE_FRONT_CODE = process.env.STORE_FRONT_CODE || "TR";
+const TRENDYOL_ENV = (process.env.TRENDYOL_ENV || "prod").toLowerCase();
+
+const APIGW_BY_ENV = {
+  prod: "https://apigw.trendyol.com",
+  stage: "https://stageapigw.trendyol.com",
+};
+
+if (!APIGW_BY_ENV[TRENDYOL_ENV]) {
+  throw new Error(`ENV hatalı: TRENDYOL_ENV=\"${TRENDYOL_ENV}\" (prod|stage olmalı)`);
+}
 
 // Çalışan aile:
-const BASE_APIGW = process.env.BASE_APIGW || "https://apigw.trendyol.com";
+const BASE_APIGW = process.env.BASE_APIGW || APIGW_BY_ENV[TRENDYOL_ENV];
 // Product Update için sapigw yolu (host aynı kalabilir, path farklı):
 const BASE_SAPIGW = process.env.BASE_SAPIGW || "https://apigw.trendyol.com";
 
@@ -36,9 +47,11 @@ function headers() {
   const token = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
   return {
     Authorization: `Basic ${token}`,
-    "User-Agent": `TomaxWeb/1.0 (SellerId:${SELLER_ID})`,
+    "User-Agent": `${SELLER_ID} - TomaxPanel`,
     Accept: "application/json",
     "Content-Type": "application/json",
+    storeFrontCode: STORE_FRONT_CODE,
+    storeFrontcode: STORE_FRONT_CODE,
   };
 }
 
@@ -101,10 +114,67 @@ app.get("/debug/config", (_, res) => {
     cwd: process.cwd(),
     port: String(PORT),
     sellerId: String(SELLER_ID || ""),
+    trendyolEnv: TRENDYOL_ENV,
+    storeFrontCode: STORE_FRONT_CODE,
+    trendyolBaseUrl: BASE_APIGW,
     baseApigw: BASE_APIGW,
     baseSapigw: BASE_SAPIGW,
     backupFile: STOCK_BACKUP_FILE,
   });
+});
+
+app.get("/debug/trendyol-auth-check", async (_, res) => {
+  try {
+    assertEnv();
+
+    const productUrl = `${BASE_APIGW}/integration/product/sellers/${SELLER_ID}/products`;
+    const ordersUrl = `${BASE_APIGW}/integration/order/sellers/${SELLER_ID}/orders`;
+
+    const [productsResult, ordersResult] = await Promise.allSettled([
+      axios.get(productUrl, {
+        headers: headers(),
+        params: { page: 0, size: 1 },
+        timeout: 30000,
+      }),
+      axios.get(ordersUrl, {
+        headers: headers(),
+        params: { status: "Created", size: 1 },
+        timeout: 30000,
+      }),
+    ]);
+
+    const mapResult = (r) => {
+      if (r.status === "fulfilled") {
+        return {
+          ok: true,
+          status: r.value.status,
+          data: r.value.data,
+        };
+      }
+      const e = pickError(r.reason);
+      return {
+        ok: false,
+        status: e.status || 500,
+        message: e.message,
+        detail: e.detail,
+      };
+    };
+
+    res.json({
+      success: true,
+      sellerId: SELLER_ID,
+      trendyolEnv: TRENDYOL_ENV,
+      baseApigw: BASE_APIGW,
+      storeFrontCode: STORE_FRONT_CODE,
+      checks: {
+        products: { usedUrl: productUrl, sentParams: { page: 0, size: 1 }, ...mapResult(productsResult) },
+        orders: { usedUrl: ordersUrl, sentParams: { status: "Created", size: 1 }, ...mapResult(ordersResult) },
+      },
+    });
+  } catch (err) {
+    const e = pickError(err);
+    res.status(e.status || 500).json({ success: false, ...e });
+  }
 });
 
 // =====================
@@ -139,22 +209,106 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Client-side filtre (archived)
+// Server-side filtre (view + archived)
 app.get("/api/products/filter", async (req, res) => {
   try {
     assertEnv();
-    const page = Number(req.query.page ?? 0);
-    const size = Number(req.query.size ?? 20);
-    const archived = req.query.archived;
+    const page = Math.max(0, Number(req.query.page ?? 0));
+    const size = Math.max(1, Number(req.query.size ?? 100));
+    const view = String(req.query.view || "active").toLowerCase() === "passive" ? "passive" : "active";
 
-    const url = `${BASE_APIGW}/integration/product/sellers/${SELLER_ID}/products?page=${page}&size=${size}`;
-    const r = await axios.get(url, { headers: headers(), timeout: 25000 });
+    const approvedBase = `${BASE_APIGW}/integration/product/sellers/${SELLER_ID}/products/approved`;
 
-    let content = r.data.content || [];
-    if (archived === "true") content = content.filter((p) => p.archived === true);
-    if (archived === "false") content = content.filter((p) => p.archived === false);
+    async function fetchAllApprovedByStatus(status) {
+      const batchSize = 100;
+      let currentPage = 0;
+      let totalPages = null;
+      let totalElements = null;
+      const all = [];
 
-    res.json({ success: true, content });
+      while (true) {
+        const params = { page: currentPage, size: batchSize, status };
+        const r = await axios.get(approvedBase, {
+          headers: headers(),
+          params,
+          timeout: 30000,
+        });
+
+        const data = r.data || {};
+        const content = Array.isArray(data.content)
+          ? data.content
+          : (Array.isArray(data.items) ? data.items : []);
+
+        all.push(...content);
+
+        const parsedTotalPages = Number(data.totalPages);
+        const parsedTotalElements = Number(data.totalElements);
+        if (Number.isFinite(parsedTotalPages)) totalPages = parsedTotalPages;
+        if (Number.isFinite(parsedTotalElements)) totalElements = parsedTotalElements;
+
+        if (!content.length) break;
+        if (Number.isFinite(totalPages) && currentPage >= totalPages - 1) break;
+        currentPage += 1;
+      }
+
+      return {
+        items: all,
+        fetchedPages: totalPages ?? (all.length ? Math.ceil(all.length / batchSize) : 0),
+        totalElements,
+      };
+    }
+
+    let mergedFromStatuses = [];
+    let merged = [];
+    let fetchedPages = 0;
+
+    if (view === "passive") {
+      const archivedResult = await fetchAllApprovedByStatus("archived");
+      const onSaleResult = await fetchAllApprovedByStatus("onSale");
+
+      mergedFromStatuses = ["archived", "onSale"];
+      fetchedPages = archivedResult.fetchedPages + onSaleResult.fetchedPages;
+
+      const map = new Map();
+      const add = (item) => {
+        const key = String(item?.barcode || item?.variantId || item?.id || JSON.stringify(item));
+        if (!map.has(key)) map.set(key, item);
+      };
+
+      archivedResult.items.forEach(add);
+      onSaleResult.items
+        .filter((p) => p?.onSale === false || p?.archived === true || String(p?.status || "").toLowerCase().includes("passive"))
+        .forEach(add);
+
+      merged = Array.from(map.values());
+    } else {
+      const activeResult = await fetchAllApprovedByStatus("onSale");
+      mergedFromStatuses = ["onSale"];
+      fetchedPages = activeResult.fetchedPages;
+      merged = activeResult.items.filter((p) => p?.onSale === true);
+    }
+
+    const totalElements = merged.length;
+    const start = page * size;
+    const end = start + size;
+    const content = merged.slice(start, end);
+
+    res.json({
+      success: true,
+      status: 200,
+      data: {
+        content,
+        totalElements,
+        page,
+        size,
+        totalPages: Math.max(1, Math.ceil(totalElements / size)),
+        meta: {
+          view,
+          fetchedPages,
+          mergedFromStatuses,
+        },
+      },
+    });
   } catch (err) {
     const e = pickError(err);
     res.status(e.status || 500).json({ success: false, ...e });
@@ -417,14 +571,34 @@ app.post("/api/products/update-title", async (req, res) => {
 // ORDERS
 // =====================
 app.get("/api/orders", async (req, res) => {
+  const usedUrl = `${BASE_APIGW}/integration/order/sellers/${SELLER_ID}/orders`;
+  const sentParams = { ...req.query };
   try {
     assertEnv();
-    const url = `${BASE_APIGW}/integration/order/sellers/${SELLER_ID}/shipment-packages`;
-    const r = await axios.get(url, { headers: headers(), params: req.query, timeout: 30000 });
-    res.json({ success: true, status: r.status, data: r.data });
+    const r = await axios.get(usedUrl, { headers: headers(), params: sentParams, timeout: 30000 });
+    res.json({ success: true, status: r.status, data: r.data, usedUrl, sentParams });
   } catch (err) {
     const e = pickError(err);
-    res.status(e.status || 500).json({ success: false, ...e });
+
+    if ((e.status || 500) === 401) {
+      console.error("[ORDERS_401]", {
+        usedUrl,
+        sentParams,
+        sellerId: SELLER_ID,
+        baseApigw: BASE_APIGW,
+        storeFrontCode: STORE_FRONT_CODE,
+        authorization: "Basic ***",
+      });
+    }
+
+    res.status(e.status || 500).json({
+      success: false,
+      status: e.status || 500,
+      message: e.message,
+      detail: e.detail,
+      usedUrl,
+      sentParams,
+    });
   }
 });
 
