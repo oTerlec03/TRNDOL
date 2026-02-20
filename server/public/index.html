@@ -640,12 +640,7 @@
         wrap.querySelectorAll("input").forEach(el => {
           if (el !== checkbox) el.checked = false;
         });
-        const nextArchivedFilter = shouldUseArchivedFilter() ? "true" : "false";
-        if (state.archivedFilter !== nextArchivedFilter) {
-          state.archivedFilter = nextArchivedFilter;
-          loadProducts();
-          return;
-        }
+        state.archivedFilter = shouldUseArchivedFilter() ? "true" : "false";
         renderProducts();
       });
       wrap.appendChild(item);
@@ -660,7 +655,7 @@
       state.subStatusFilter = "all";
       state.archivedFilter = shouldUseArchivedFilter() ? "true" : "false";
       renderSubfilters();
-      renderProducts();
+      loadProducts();
     });
   });
 
@@ -891,6 +886,11 @@
       if (Array.isArray(data.items)) return data.items;
       if (Array.isArray(data.products)) return data.products;
       if (Array.isArray(data.data)) return data.data;
+      if (data.data && typeof data.data === "object") {
+        if (Array.isArray(data.data.content)) return data.data.content;
+        if (Array.isArray(data.data.items)) return data.data.items;
+        if (Array.isArray(data.data.products)) return data.data.products;
+      }
 
       // 3) data.content tek obje ise (bazı implementasyonlar)
       if (data.content && typeof data.content === "object" && !Array.isArray(data.content)) {
@@ -911,7 +911,11 @@
 
   function extractTotalCount(data){
     if (!data || typeof data !== "object") return null;
-    const candidates = [data.totalElements, data.totalCount, data.total, data.count];
+    const nested = data.data && typeof data.data === "object" ? data.data : null;
+    const candidates = [
+      data.totalElements, data.totalCount, data.total, data.count,
+      nested?.totalElements, nested?.totalCount, nested?.total, nested?.count
+    ];
     for (const value of candidates){
       if (Number.isFinite(value)) return value;
     }
@@ -919,14 +923,14 @@
   }
 
   async function loadProducts(){
-    const archived = state.archivedFilter;
-    const batchSize = 200;
+    const batchSize = 100;
+    const view = (state.statusFilter === "passive") ? "passive" : "active";
     let page = 0;
     let totalCount = null;
     let all = [];
 
     while (true) {
-      const url = `/api/products/filter?archived=${encodeURIComponent(archived)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(batchSize)}`;
+      const url = `/api/products/filter?view=${encodeURIComponent(view)}&page=${encodeURIComponent(page)}&size=${encodeURIComponent(batchSize)}`;
       addLog(`Ürünler getiriliyor: ${url}`);
       const r = await apiFetch(url);
       state.lastProductsResponse = r.data;
@@ -939,8 +943,12 @@
         return;
       }
 
-      const products = normalizeProductsResponse(r.data);
-      const nextTotal = extractTotalCount(r.data);
+      const payload = (r.data && typeof r.data === "object" && r.data.data && typeof r.data.data === "object")
+        ? r.data.data
+        : r.data;
+
+      const products = normalizeProductsResponse(payload);
+      const nextTotal = extractTotalCount(payload);
       if (Number.isFinite(nextTotal)) totalCount = nextTotal;
 
       all = all.concat(products);
@@ -950,7 +958,7 @@
     }
 
     state.allProducts = all;
-    addLog(`Ürünler geldi: ${state.allProducts.length} kayıt`);
+    addLog(`Ürünler geldi: ${state.allProducts.length} kayıt (view=${view})`);
     renderProducts();
     updateStatusCounts(state.allProducts, totalCount);
   }

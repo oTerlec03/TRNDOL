@@ -21,9 +21,19 @@ const SELLER_ID = process.env.SELLER_ID;
 const API_KEY = process.env.API_KEY;
 const API_SECRET = process.env.API_SECRET;
 const STORE_FRONT_CODE = process.env.STORE_FRONT_CODE || "TR";
+const TRENDYOL_ENV = (process.env.TRENDYOL_ENV || "prod").toLowerCase();
+
+const APIGW_BY_ENV = {
+  prod: "https://apigw.trendyol.com",
+  stage: "https://stageapigw.trendyol.com",
+};
+
+if (!APIGW_BY_ENV[TRENDYOL_ENV]) {
+  throw new Error(`ENV hatalı: TRENDYOL_ENV=\"${TRENDYOL_ENV}\" (prod|stage olmalı)`);
+}
 
 // Çalışan aile:
-const BASE_APIGW = process.env.BASE_APIGW || "https://apigw.trendyol.com";
+const BASE_APIGW = process.env.BASE_APIGW || APIGW_BY_ENV[TRENDYOL_ENV];
 // Product Update için sapigw yolu (host aynı kalabilir, path farklı):
 const BASE_SAPIGW = process.env.BASE_SAPIGW || "https://apigw.trendyol.com";
 
@@ -37,7 +47,7 @@ function headers() {
   const token = Buffer.from(`${API_KEY}:${API_SECRET}`).toString("base64");
   return {
     Authorization: `Basic ${token}`,
-    "User-Agent": `TomaxWeb/1.0 (SellerId:${SELLER_ID})`,
+    "User-Agent": `${SELLER_ID} - TomaxPanel`,
     Accept: "application/json",
     "Content-Type": "application/json",
     storeFrontCode: STORE_FRONT_CODE,
@@ -104,12 +114,67 @@ app.get("/debug/config", (_, res) => {
     cwd: process.cwd(),
     port: String(PORT),
     sellerId: String(SELLER_ID || ""),
+    trendyolEnv: TRENDYOL_ENV,
     storeFrontCode: STORE_FRONT_CODE,
     trendyolBaseUrl: BASE_APIGW,
     baseApigw: BASE_APIGW,
     baseSapigw: BASE_SAPIGW,
     backupFile: STOCK_BACKUP_FILE,
   });
+});
+
+app.get("/debug/trendyol-auth-check", async (_, res) => {
+  try {
+    assertEnv();
+
+    const productUrl = `${BASE_APIGW}/integration/product/sellers/${SELLER_ID}/products`;
+    const ordersUrl = `${BASE_APIGW}/integration/order/sellers/${SELLER_ID}/orders`;
+
+    const [productsResult, ordersResult] = await Promise.allSettled([
+      axios.get(productUrl, {
+        headers: headers(),
+        params: { page: 0, size: 1 },
+        timeout: 30000,
+      }),
+      axios.get(ordersUrl, {
+        headers: headers(),
+        params: { status: "Created", size: 1 },
+        timeout: 30000,
+      }),
+    ]);
+
+    const mapResult = (r) => {
+      if (r.status === "fulfilled") {
+        return {
+          ok: true,
+          status: r.value.status,
+          data: r.value.data,
+        };
+      }
+      const e = pickError(r.reason);
+      return {
+        ok: false,
+        status: e.status || 500,
+        message: e.message,
+        detail: e.detail,
+      };
+    };
+
+    res.json({
+      success: true,
+      sellerId: SELLER_ID,
+      trendyolEnv: TRENDYOL_ENV,
+      baseApigw: BASE_APIGW,
+      storeFrontCode: STORE_FRONT_CODE,
+      checks: {
+        products: { usedUrl: productUrl, sentParams: { page: 0, size: 1 }, ...mapResult(productsResult) },
+        orders: { usedUrl: ordersUrl, sentParams: { status: "Created", size: 1 }, ...mapResult(ordersResult) },
+      },
+    });
+  } catch (err) {
+    const e = pickError(err);
+    res.status(e.status || 500).json({ success: false, ...e });
+  }
 });
 
 // =====================
@@ -514,6 +579,18 @@ app.get("/api/orders", async (req, res) => {
     res.json({ success: true, status: r.status, data: r.data, usedUrl, sentParams });
   } catch (err) {
     const e = pickError(err);
+
+    if ((e.status || 500) === 401) {
+      console.error("[ORDERS_401]", {
+        usedUrl,
+        sentParams,
+        sellerId: SELLER_ID,
+        baseApigw: BASE_APIGW,
+        storeFrontCode: STORE_FRONT_CODE,
+        authorization: "Basic ***",
+      });
+    }
+
     res.status(e.status || 500).json({
       success: false,
       status: e.status || 500,
